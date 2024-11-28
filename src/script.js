@@ -303,8 +303,8 @@ function StructuredData(header) {
 dmap.md5 = EncodedValue(Uint8Array, dmap.save.size - 16, 16, false);
 // Read-only; the size can vary because of Extra Options
 dmap.name = EncodedValue(String, 0x5A31, 8, false);
-dmap.money = EncodedValue(Uint32Array, 0x4039, undefined, undefined, "Money");
-dmap.pursuitBounty = EncodedValue(Uint32Array, 0xE865, undefined, undefined, "Pursuit bounty");
+dmap.money = EncodedValue(Uint32Array, 0x4039, undefined, undefined, "MONEY");
+dmap.pursuitBounty = EncodedValue(Uint32Array, 0xE865, undefined, undefined, "PURSUIT BOUNTY");
 dmap.caseName = CustomEncodedValue(
 	function () {
 		return new TextDecoder().decode(dmap.save.value.buffer.slice(this.pos, this.pos + this.length));
@@ -330,9 +330,9 @@ dmap.caseName = CustomEncodedValue(
 	0xC,
 	undefined,
 	undefined,
-	"Case name",
+	"CASE NAME",
 	undefined,
-	"Only 12 characters. Can persist"
+	"ONLY 12 CHARACTERS. CAN PERSIST"
 );
 
 dmap.carsContent = EncodedValue(Uint8Array, 0xE2ED, CAR_STRUCT_SIZE * MAX_CARS, false, undefined);
@@ -341,167 +341,167 @@ dmap.pursuitContent = EncodedValue(Uint8Array, 0xF2BA, PURSUIT_STRUCT_SIZE * MAX
 dmap.carsData = [];
 dmap.pursuitsData = [];
 
-dmap.lifetimePursuit = StructuredData("Lifetime pursuit");
+dmap.lifetimePursuit = StructuredData("LIFETIME PURSUIT");
 dmap.lifetimePursuit.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-	`Pursuit length`,
+	`PURSUIT LENGTH`,
 	undefined,
 	dmap.pursuitContent
 ));
 
 dmap.lifetimePursuit.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-	`Total police vehicles involved`,
+	`TOTAL POLICE VEHICLES INVOLVED`,
 	undefined,
 	dmap.lifetimePursuit.dataValues[0]
 ));
 
 dmap.lifetimePursuit.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-	`Police vehicles damaged`,
+	`POLICE VEHICLES DAMAGED`,
 	undefined,
 	dmap.lifetimePursuit.dataValues[1]
 ));
 
 dmap.lifetimePursuit.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-	`Police vehicles immobilized`,
+	`POLICE VEHICLES IMMOBILIZED`,
 	undefined,
 	dmap.lifetimePursuit.dataValues[2]
 ));
 
 dmap.lifetimePursuit.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-	`Spike strips dodged`,
+	`SPIKE STRIPS DODGED`,
 	undefined,
 	dmap.lifetimePursuit.dataValues[3]
 ));
 
 dmap.lifetimePursuit.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-	`Roadblocks dodged`,
+	`ROADBLOCKS DODGED`,
 	undefined,
 	dmap.lifetimePursuit.dataValues[4]
 ));
 
 dmap.lifetimePursuit.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-	`Helicopters deployed`,
+	`HELICOPTERS DEPLOYED`,
 	undefined,
 	dmap.lifetimePursuit.dataValues[5]
 ));
 
 dmap.lifetimePursuit.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-	`Cost to state achieved`,
+	`COST TO STATE ACHIEVED`,
 	undefined,
 	dmap.lifetimePursuit.dataValues[6]
 ));
 
-dmap.singlePursuit = StructuredData("Single pursuit");
+dmap.singlePursuit = StructuredData("SINGLE PURSUIT");
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
 	dmap.lifetimePursuit.dataValues[7].pos + 2 * Uint32Array.BYTES_PER_ELEMENT,
 	undefined,
 	undefined,
-	`Pursuit length`
+	`PURSUIT LENGTH`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
 	dmap.singlePursuit.dataValues[0].pos + 2 * Uint32Array.BYTES_PER_ELEMENT,
 	undefined,
 	undefined,
-	`Total police vehicles involved`
+	`TOTAL POLICE VEHICLES INVOLVED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
 	dmap.singlePursuit.dataValues[1].pos + 2 * Uint32Array.BYTES_PER_ELEMENT,
 	undefined,
 	undefined,
-	`Police vehicles damaged`
+	`POLICE VEHICLES DAMAGED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
 	dmap.singlePursuit.dataValues[2].pos + 2 * Uint32Array.BYTES_PER_ELEMENT,
 	undefined,
 	undefined,
-	`Police vehicles immobilized`
+	`POLICE VEHICLES IMMOBILIZED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
 	dmap.singlePursuit.dataValues[3].pos + 2 * Uint32Array.BYTES_PER_ELEMENT,
 	undefined,
 	undefined,
-	`Spike strips dodged`
+	`SPIKE STRIPS DODGED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
 	dmap.singlePursuit.dataValues[4].pos + 2 * Uint32Array.BYTES_PER_ELEMENT,
 	undefined,
 	undefined,
-	`Roadblocks dodged`
+	`ROADBLOCKS DODGED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
 	dmap.singlePursuit.dataValues[5].pos + 2 * Uint32Array.BYTES_PER_ELEMENT,
 	undefined,
 	undefined,
-	`Helicopters deployed`
+	`HELICOPTERS DEPLOYED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
 	dmap.singlePursuit.dataValues[6].pos + 2 * Uint32Array.BYTES_PER_ELEMENT,
 	undefined,
 	undefined,
-	`Cost to state achieved`
+	`COST TO STATE ACHIEVED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
 	dmap.singlePursuit.dataValues[7].pos + 2 * Uint32Array.BYTES_PER_ELEMENT,
 	undefined,
 	undefined,
-	`Infractions recorded`
+	`INFRACTIONS RECORDED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
 	dmap.singlePursuit.dataValues[8].pos + 2 * Uint32Array.BYTES_PER_ELEMENT,
 	undefined,
 	undefined,
-	`Pursuit bounty achieved`
+	`PURSUIT BOUNTY ACHIEVED`
 ));
 
-dmap.infractions = StructuredData("Infractions");
-dmap.infractions.dataValues.push(EncodedValue(Uint16Array, 0xE86D, undefined, undefined, `Speeding`));
+dmap.infractions = StructuredData("INFRACTIONS");
+dmap.infractions.dataValues.push(EncodedValue(Uint16Array, 0xE86D, undefined, undefined, `SPEEDING`));
 
 dmap.infractions.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-	`Excessive speeding`,
+	`EXCESSIVE SPEEDING`,
 	undefined,
 	dmap.infractions.dataValues[0]
 ));
 
 dmap.infractions.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-	`Reckless driving`,
+	`RECKLESS DRIVING`,
 	undefined,
 	dmap.infractions.dataValues[1]
 ));
 
 dmap.infractions.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-	`Ramming a police vehicle`,
+	`RAMMING A POLICE VEHICLE`,
 	undefined,
 	dmap.infractions.dataValues[2]
 ));
 
 dmap.infractions.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-	`Hit and run`,
+	`HIT AND RUN`,
 	undefined,
 	dmap.infractions.dataValues[3]
 ));
 
 dmap.infractions.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-	`Damage to property`,
+	`DAMAGE TO PROPERTY`,
 	undefined,
 	dmap.infractions.dataValues[4]
 ));
 
 dmap.infractions.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-	`Resisting arrest`,
+	`RESISTING ARREST`,
 	undefined,
 	dmap.infractions.dataValues[5]
 ));
 
 dmap.infractions.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-	`Driving off roadway`,
+	`DRIVING OFF ROADWAY`,
 	undefined,
 	dmap.infractions.dataValues[6]
 ));
@@ -638,52 +638,52 @@ function fetchCarData(index) {
 		return;
 	}
 
-	let carData = StructuredData(`Car #${index + 1}`);
+	let carData = StructuredData(`CAR #${index + 1}`);
 
 	let bountyPos = dmap.carsContent.pos + (index * CAR_STRUCT_SIZE) + CAR_ID_SIZE;
-	carData.dataValues.push(EncodedValue(Uint32Array, bountyPos, undefined, undefined, `Bounty`));
+	carData.dataValues.push(EncodedValue(Uint32Array, bountyPos, undefined, undefined, `BOUNTY`));
 
 	let speedingPos = bountyPos + carData.dataValues[0].type.BYTES_PER_ELEMENT + 0x4;
-	carData.dataValues.push(EncodedValue(Uint16Array, speedingPos, undefined, undefined, `Speeding`));
+	carData.dataValues.push(EncodedValue(Uint16Array, speedingPos, undefined, undefined, `SPEEDING`));
 
 	carData.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-		`Excessive speeding`,
+		`EXCESSIVE SPEEDING`,
 		undefined,
 		carData.dataValues[1]
 	));
 
 	carData.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-		`Reckless driving`,
+		`RECKLESS DRIVING`,
 		undefined,
 		carData.dataValues[2]
 	));
 
 	carData.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-		`Ramming a police vehicle`,
+		`RAMMING A POLICE VEHICLE`,
 		undefined,
 		carData.dataValues[3]
 	));
 
 	carData.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-		`Hit and run`,
+		`HIT AND RUN`,
 		undefined,
 		carData.dataValues[4]
 	));
 
 	carData.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-		`Damage to property`,
+		`DAMAGE TO PROPERTY`,
 		undefined,
 		carData.dataValues[5]
 	));
 
 	carData.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-		`Resisting arrest`,
+		`RESISTING ARREST`,
 		undefined,
 		carData.dataValues[6]
 	));
 
 	carData.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
-		`Driving off roadway`,
+		`DRIVING OFF ROADWAY`,
 		undefined,
 		carData.dataValues[7]
 	));
@@ -692,13 +692,13 @@ function fetchCarData(index) {
 }
 
 function fetchSinglePursuitData(index) {
-	let pursuitData = StructuredData(`Pursuit #${index + 1}`);
+	let pursuitData = StructuredData(`PURSUIT #${index + 1}`);
 
 	let timePos = dmap.pursuitContent.pos + (index * PURSUIT_STRUCT_SIZE) + PURSUIT_ID_SIZE;
-	pursuitData.dataValues.push(EncodedValue(Uint32Array, timePos, undefined, undefined, `Pursuit length`));
+	pursuitData.dataValues.push(EncodedValue(Uint32Array, timePos, undefined, undefined, `PURSUIT LENGTH`));
 
 	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-		`Pursuit bounty achieved`,
+		`PURSUIT BOUNTY ACHIEVED`,
 		undefined,
 		pursuitData.dataValues[0]
 	));
@@ -710,49 +710,49 @@ function fetchSinglePursuitData(index) {
 	));
 
 	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-		`Total police vehicles involved`,
+		`TOTAL POLICE VEHICLES INVOLVED`,
 		undefined,
 		pursuitData.dataValues[2]
 	));
 
 	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-		`Police vehicles damaged`,
+		`POLICE VEHICLES DAMAGED`,
 		undefined,
 		pursuitData.dataValues[3]
 	));
 
 	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-		`Police vehicles immobilized`,
+		`POLICE VEHICLES IMMOBILIZED`,
 		undefined,
 		pursuitData.dataValues[4]
 	));
 
 	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-		`Roadblocks dodged`,
+		`ROADBLOCKS DODGED`,
 		undefined,
 		pursuitData.dataValues[5]
 	));
 
 	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-		`Spike strips dodged`,
+		`SPIKE STRIPS DODGED`,
 		undefined,
 		pursuitData.dataValues[6]
 	));
 
 	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-		`Cost to state achieved`,
+		`COST TO STATE ACHIEVED`,
 		undefined,
 		pursuitData.dataValues[7]
 	));
 
 	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-		`Infractions recorded`,
+		`INFRACTIONS RECORDED`,
 		undefined,
 		pursuitData.dataValues[8]
 	));
 
 	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-		`Helicopters deployed`,
+		`HELICOPTERS DEPLOYED`,
 		undefined,
 		pursuitData.dataValues[9]
 	));
@@ -809,7 +809,7 @@ fileInput.addEventListener("click", function (event) {
 fileInput.addEventListener("change", function (event) {
 	playerName.innerText = `NAME : `;
 	fileHash.innerText = `HASH : `;
-	saveData.innerHTML = `No data`;
+	saveData.innerHTML = `NO DATA`;
 	dmap.save.value = null;
 	dmap.carsData = [];
 	dmap.pursuitsData = [];
