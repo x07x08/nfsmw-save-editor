@@ -35,18 +35,30 @@
 
 	<input type="file" id="opensave" style="display: none;"></input>
 
-	<footer style="display: grid; grid-auto-flow: column;">
-		<button class="button-icon" style="justify-self: right;" id="openbutton">
-			<img src="../external/images/opensaveicon.png" class="icon" />
+	<footer style="display: grid; grid-auto-flow: column; grid-template-columns: 1fr;">
+		<div style="justify-self: center; align-self: center;">
+			<button class="button-icon" id="openbutton">
+				<img src="../external/images/opensaveicon.png" class="icon" />
 
-			<p>Select profile</p>
-		</button>
+				<p>Select profile</p>
+			</button>
 
-		<button class="button-icon" style="justify-self: left;" id="savebutton">
-			<img src="../external/images/saveicon.png" class="icon" />
+			<button class="button-icon" id="savebutton">
+				<img src="../external/images/saveicon.png" class="icon" />
 
-			<p>Save</p>
-		</button>
+				<p>Save</p>
+			</button>
+		</div>
+
+		<div style="justify-self: end; align-self: center;">
+			<button class="button-icon" id="soundbutton">
+				<img src="../external/images/soundicon.png" class="icon" style="width: 48px; height: 48px;" />
+			</button>
+
+			<button class="button-icon" id="musicbutton">
+				<img src="../external/images/musicicon.png" class="icon" style="width: 48px; height: 48px;" />
+			</button>
+		</div>
 	</footer>
 
 	<script src="script.js"></script>
