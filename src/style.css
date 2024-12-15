@@ -152,7 +152,7 @@
 [data-tooltip]::before {
 	background: black;
 	color: white;
-	outline: 2px dotted var(--background-green);
+	outline: 4px dashed var(--background-green);
 	border-bottom: none;
 	border-radius: 0%;
 }
@@ -162,8 +162,6 @@
 }
 
 .data-item:hover,
-.button-icon:focus,
-.button-icon:hover,
 .data-header:hover,
 .data-header:focus,
 .data-item:has(.data-input:focus) {
