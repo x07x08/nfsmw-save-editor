@@ -92,6 +92,7 @@
 	padding: 0.25rem;
 	height: fit-content;
 	position: relative;
+	box-shadow: none;
 }
 
 /*https://css-tip.com/corner-only-border/*/
