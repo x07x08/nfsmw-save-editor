@@ -230,12 +230,24 @@
 	margin: 0px !important;
 	padding-right: 1rem !important;
 	text-align: center;
+	text-align-last: center;
 	border: none;
 	outline: none;
 	width: 15rem !important;
 	justify-self: right;
 	box-shadow: none;
 	background-color: transparent;
+}
+
+select.data-input {
+	cursor: pointer;
+	background-image: none !important;
+}
+
+select.data-input option {
+	background-color: black;
+	color: white;
+	text-align: center;
 }
 
 .data-content::before {
