@@ -221,7 +221,8 @@ function EncodedValue(
 	description = "",
 	littleEndian = true,
 	prev = undefined,
-	tooltip = undefined
+	tooltip = undefined,
+	options = undefined
 ) {
 	return {
 		__proto__: EncodedValue.prototype,
@@ -235,6 +236,7 @@ function EncodedValue(
 		description: description,
 		littleEndian: littleEndian,
 		tooltip: tooltip,
+		options: options,
 
 		get value() {
 			if (dmap.save.value == null) return null;
@@ -300,7 +302,8 @@ function CustomEncodedValue(
 	littleEndian = true,
 	description = "",
 	prev = undefined,
-	tooltip = undefined
+	tooltip = undefined,
+	options = undefined
 ) {
 	let obj = {
 		__proto__: EncodedValue.prototype,
@@ -314,6 +317,7 @@ function CustomEncodedValue(
 		description: description,
 		littleEndian: littleEndian,
 		tooltip: tooltip,
+		options: options,
 	};
 
 	Object.defineProperty(obj, "value", {
@@ -334,8 +338,50 @@ function StructuredData(header) {
 }
 
 dmap.md5 = EncodedValue(Uint8Array, makePlatformProperty(dmap.save.size.pc - 16, dmap.save.size.ps2 - 16), 16, false);
-// Read-only; the size can vary because of Extra Options
-dmap.name = EncodedValue(String, makePlatformProperty(0x5A31), 8, false);
+dmap.name = CustomEncodedValue(
+	function () {
+		if (dmap.save.value == null) return null;
+		let slice = dmap.save.value.buffer.slice(this.pos[currentPlatform], this.pos[currentPlatform] + this.length);
+		let str = new TextDecoder().decode(slice);
+		let nullIdx = str.indexOf(NULL);
+		return nullIdx !== -1 ? str.slice(0, nullIdx) : str;
+	},
+
+	function (val) {
+		if (dmap.save.value == null) return;
+		let alias;
+		if (typeof val === "string") {
+			alias = val.trim();
+		} else if (val instanceof ArrayBuffer || ArrayBuffer.isView(val)) {
+			let str = new TextDecoder().decode(val);
+			let nullIdx = str.indexOf(NULL);
+			alias = nullIdx !== -1 ? str.slice(0, nullIdx) : str;
+		} else {
+			alias = String(val);
+		}
+		if (alias.length === 0 || alias.length > 16) return;
+
+		let encoded = new TextEncoder().encode(alias);
+		for (let i = 0; i < this.length; i++) {
+			let b = i < encoded.length ? encoded[i] : 0;
+			SetTypedValue(Uint8Array, this.pos[currentPlatform] + i, b, this.littleEndian);
+		}
+
+		if (playerName) {
+			playerName.innerText = `NAME : ` + alias;
+		}
+
+		updateHash();
+	},
+	String,
+	makePlatformProperty(0x5A31),
+	0x24,
+	true,
+	true,
+	"ALIAS",
+	undefined,
+	"MAX 16 CHARACTERS"
+);
 dmap.money = EncodedValue(Uint32Array, makePlatformProperty(0x4039), undefined, undefined, "MONEY");
 dmap.pursuitBounty = EncodedValue(Uint32Array, makePlatformProperty(0xE865, 0xE8A1), undefined, undefined, "PURSUIT BOUNTY");
 dmap.caseName = CustomEncodedValue(
@@ -557,6 +603,190 @@ dmap.content = {
 	pos: 0x34,
 };
 
+const SPEEDLIST_ENTRY_SIZE = 8;
+const MAX_SPEEDLIST_EVENTS = 25;
+const SPEEDLIST_BASE_PC = 0x5A55;
+
+const RACE_ENTRY_HEADER_SIZE = 8;
+const RACE_ENTRY_TOTAL_SIZE = 20;
+const MAX_RACE_ENTRIES = 29;
+const RACE_BASE_PC = 0x5BE5;
+
+const JUNKMAN_BASE_PC = 0x5739;
+const JUNKMAN_SLOT_COUNT = 63;
+const JUNKMAN_SLOT_SIZE = 12;
+
+const JUNKMAN_TOKENS = [
+	{ id: 1, name: "UNIQUE BRAKES" },
+	{ id: 2, name: "UNIQUE ENGINE" },
+	{ id: 3, name: "UNIQUE NITROUS" },
+	{ id: 4, name: "UNIQUE TURBO / SUPERCHARGER" },
+	{ id: 5, name: "UNIQUE SUSPENSION" },
+	{ id: 6, name: "UNIQUE TIRES" },
+	{ id: 7, name: "UNIQUE TRANSMISSION" },
+	{ id: 8, name: "UNIQUE BODY KIT" },
+	{ id: 9, name: "UNIQUE HOOD" },
+	{ id: 10, name: "UNIQUE SPOILER" },
+	{ id: 11, name: "UNIQUE RIMS" },
+	{ id: 12, name: "UNIQUE ROOF SCOOP" },
+	{ id: 13, name: "UNIQUE CUSTOM GAUGES" },
+	{ id: 14, name: "UNIQUE VINYL" },
+	{ id: 15, name: "DECAL" },
+	{ id: 16, name: "PAINT" },
+	{ id: 17, name: "GET OUT OF JAIL FREE" },
+	{ id: 18, name: "PINK SLIP TO RIVAL" },
+	{ id: 19, name: "EXTRA CASH REWARD" },
+	{ id: 20, name: "EXTRA IMPOUND STRIKE" },
+	{ id: 21, name: "RELEASE FROM IMPOUND" },
+];
+
+const BLACKLIST_RIVALS = [
+	{ id: 15, name: "SONNY", car: "Volkswagen Golf GTI" },
+	{ id: 14, name: "TAZ", car: "Lexus IS300" },
+	{ id: 13, name: "VIC", car: "Toyota Supra" },
+	{ id: 12, name: "IZZY", car: "Mazda RX-8" },
+	{ id: 11, name: "BIG LOU", car: "Mitsubishi Eclipse" },
+	{ id: 10, name: "BARON", car: "Porsche Cayman S" },
+	{ id: 9, name: "EARL", car: "Mitsubishi Lancer EVO VIII" },
+	{ id: 8, name: "JEWELS", car: "Ford Mustang GT" },
+	{ id: 7, name: "KAZE", car: "Mercedes-Benz CLK 500" },
+	{ id: 6, name: "MING", car: "Lamborghini Gallardo" },
+	{ id: 5, name: "WEBSTER", car: "Chevrolet Corvette C6" },
+	{ id: 4, name: "JV", car: "Dodge Viper SRT-10" },
+	{ id: 3, name: "RONNIE", car: "Aston Martin DB9" },
+	{ id: 2, name: "BULL", car: "Mercedes-Benz SLR McLaren" },
+	{ id: 1, name: "RAZOR", car: "BMW M3 GTR" },
+];
+
+dmap.careerStats = StructuredData("CAREER SETTINGS");
+dmap.careerStats.dataValues.push(EncodedValue(Uint8Array, makePlatformProperty(0x4034), undefined, undefined, `ACTIVE CAR NUMBER`));
+dmap.careerStats.dataValues.push(CustomEncodedValue(
+	function () {
+		if (dmap.save.value == null) return null;
+		return dmap.save.value.getUint8(0x4038);
+	},
+	function (val) {
+		if (dmap.save.value == null) return;
+		let n = parseInt(val);
+		if (isNaN(n) || n < 1 || n > 15) return;
+		dmap.save.value.setUint8(0x4038, n);
+		updateHash();
+	},
+	Uint8Array,
+	makePlatformProperty(0x4038),
+	1,
+	true,
+	true,
+	`CURRENT BLACKLIST RIVAL`,
+	undefined,
+	`1 - 15 (15=SONNY, 1=RAZOR)`,
+	BLACKLIST_RIVALS.map(r => ({ value: r.id, text: `#${r.id} ${r.name}` }))
+));
+dmap.careerStats.dataValues.push(CustomEncodedValue(
+	function () {
+		if (dmap.save.value == null) return null;
+		let flags = dmap.save.value.getUint16(0x4040, true);
+		return (flags & 0x1000) !== 0 ? 1 : 0;
+	},
+	function (val) {
+		if (dmap.save.value == null) return;
+		let flags = dmap.save.value.getUint16(0x4040, true);
+		let n = parseInt(val);
+		if (n === 1) {
+			flags |= 0x1000;
+		} else {
+			flags &= ~0x1000;
+		}
+		dmap.save.value.setUint16(0x4040, flags, true);
+		updateHash();
+	},
+	Uint8Array,
+	makePlatformProperty(0x4040),
+	1,
+	true,
+	true,
+	`RAZOR DEFEATED (ENDGAME)`,
+	undefined,
+	`0=NO  1=YES`,
+	[
+		{ value: 0, text: "NO" },
+		{ value: 1, text: "YES" },
+	]
+));
+dmap.careerStats.dataValues.push(CustomEncodedValue(
+	function () {
+		if (dmap.save.value == null) return null;
+		let flags = dmap.save.value.getUint16(0x4040, true);
+		return (flags & 0x0040) !== 0 ? 1 : 0;
+	},
+	function (val) {
+		if (dmap.save.value == null) return;
+		let flags = dmap.save.value.getUint16(0x4040, true);
+		let n = parseInt(val);
+		if (n === 1) {
+			flags |= 0x0040;
+		} else {
+			flags &= ~0x0040;
+		}
+		dmap.save.value.setUint16(0x4040, flags, true);
+		updateHash();
+	},
+	Uint8Array,
+	makePlatformProperty(0x4040),
+	1,
+	true,
+	true,
+	`CAREER 100% COMPLETED`,
+	undefined,
+	`0=NO  1=YES`,
+	[
+		{ value: 0, text: "NO" },
+		{ value: 1, text: "YES" },
+	]
+));
+dmap.careerStats.dataValues.push(CustomEncodedValue(
+	function () {
+		if (dmap.save.value == null) return null;
+		let done = 0;
+		for (let k = 0; k < 248; k++) {
+			let f = dmap.save.value.getUint32(0x42C1 + k * 16 + 4, true);
+			if ((f & 0x0A) === 0x0A) done++;
+		}
+		return done;
+	},
+	function (val) {
+		if (dmap.save.value == null) return;
+		let target = parseInt(val);
+		if (isNaN(target) || target < 0) return;
+		target = Math.min(248, target);
+		let currentDone = 0;
+		for (let k = 0; k < 248; k++) {
+			let off = 0x42C1 + k * 16 + 4;
+			let f = dmap.save.value.getUint32(off, true);
+			if (currentDone < target) {
+				dmap.save.value.setUint32(off, f | 0x0A, true);
+				currentDone++;
+			} else {
+				dmap.save.value.setUint32(off, f & ~0x0A, true);
+			}
+		}
+		updateHash();
+	},
+	Uint16Array,
+	makePlatformProperty(0x42C1),
+	1,
+	true,
+	true,
+	`CAREER RACES COMPLETED`,
+	undefined,
+	`0 - 248`
+));
+
+dmap.blacklistData = [];
+dmap.junkmanData = [];
+dmap.speedListData = [];
+dmap.raceTimesData = [];
+
 let fileInput = document.querySelector("#opensave");
 let saveButton = document.querySelector("#savebutton");
 let openButton = document.querySelector("#openbutton");
@@ -604,6 +834,29 @@ openButton.addEventListener("click", function (event) {
 	openButton.blur();
 });
 
+function syncUI() {
+	for (const key in dmap) {
+		let group = dmap[key];
+		if (Array.isArray(group)) {
+			for (let sub of group) {
+				if (sub && Array.isArray(sub.dataValues)) {
+					for (let item of sub.dataValues) {
+						if (item.element) {
+							item.element.value = item.value;
+						}
+					}
+				}
+			}
+		} else if (group && Array.isArray(group.dataValues)) {
+			for (let item of group.dataValues) {
+				if (item.element) {
+					item.element.value = item.value;
+				}
+			}
+		}
+	}
+}
+
 function addEntry(list, data) {
 	let item = crel("li", { class: "data-item" });
 
@@ -619,13 +872,30 @@ function addEntry(list, data) {
 	content.innerText = data.description;
 	crel(item, content);
 
-	let input = crel("input", { class: "data-input", type: (data.type != String) ? "number" : "text" });
-	input.value = data.value;
+	let input;
+	if (data.options && Array.isArray(data.options)) {
+		input = crel("select", { class: "data-input options-list" });
+		for (let opt of data.options) {
+			let val = (typeof opt === "object") ? opt.value : opt;
+			let text = (typeof opt === "object") ? opt.text : opt;
+			let option = crel("option", { value: val });
+			option.innerText = text;
+			crel(input, option);
+		}
+		input.value = data.value;
+	} else {
+		input = crel("input", { class: "data-input", type: (data.type != String) ? "number" : "text" });
+		input.value = data.value;
+	}
+
+	data.element = input;
 
 	input.addEventListener("change", function (event) {
 		if (playSound) new Audio(CONFIRM_SOUND).play();
 
 		data.value = event.target.value;
+
+		syncUI();
 	});
 
 	input.addEventListener("focus", function (event) {
@@ -706,8 +976,46 @@ function fetchCarData(index) {
 
 	let carData = StructuredData(`CAR #${index + 1}`);
 
-	let bountyPos = dmap.carsContent.pos[currentPlatform] + (index * CAR_STRUCT_SIZE) + CAR_ID_SIZE;
+	let carBase = dmap.carsContent.pos[currentPlatform] + (index * CAR_STRUCT_SIZE);
+	let bountyPos = carBase + CAR_ID_SIZE;
 	carData.dataValues.push(EncodedValue(Uint32Array, makePlatformProperty(bountyPos), undefined, undefined, `BOUNTY`));
+
+	let heatPos = carBase + 0x0C;
+	carData.dataValues.push(CustomEncodedValue(
+		function () {
+			if (dmap.save.value == null) return null;
+			let h = dmap.save.value.getFloat32(heatPos, true);
+			return parseFloat(h.toFixed(2));
+		},
+		function (val) {
+			if (dmap.save.value == null) return;
+			let h = parseFloat(val);
+			if (isNaN(h)) return;
+			h = Math.max(1.0, Math.min(5.0, h));
+			dmap.save.value.setFloat32(heatPos, h, true);
+			updateHash();
+		},
+		Float32Array,
+		makePlatformProperty(heatPos),
+		1,
+		true,
+		true,
+		`HEAT LEVEL`,
+		undefined,
+		`1.0 - 5.0`
+	));
+
+	let strikesPos = carBase + 0x03;
+	carData.dataValues.push(EncodedValue(Uint8Array, makePlatformProperty(strikesPos), undefined, undefined, `IMPOUND STRIKES`));
+
+	let maxStrikesPos = carBase + 0x02;
+	carData.dataValues.push(EncodedValue(Uint8Array, makePlatformProperty(maxStrikesPos), undefined, undefined, `MAX IMPOUND STRIKES`));
+
+	let escapedPos = carBase + 0x14;
+	carData.dataValues.push(EncodedValue(Uint16Array, makePlatformProperty(escapedPos), undefined, undefined, `PURSUITS EVADED`));
+
+	let bustedPos = carBase + 0x16;
+	carData.dataValues.push(EncodedValue(Uint16Array, makePlatformProperty(bustedPos), undefined, undefined, `PURSUITS BUSTED`));
 
 	let speedingPos = bountyPos + carData.dataValues[0].type.BYTES_PER_ELEMENT + 0x4;
 	carData.dataValues.push(EncodedValue(Uint16Array, makePlatformProperty(speedingPos), undefined, undefined, `SPEEDING`));
@@ -826,13 +1134,239 @@ function fetchSinglePursuitData(index) {
 	dmap.pursuitsData.push(pursuitData);
 }
 
+function fetchBlacklistData() {
+	if (currentPlatform !== "pc") return;
+
+	let blGroup = StructuredData("BLACKLIST RIVALS");
+
+	for (let i = 0; i < BLACKLIST_RIVALS.length; i++) {
+		let rival = BLACKLIST_RIVALS[i];
+
+		let entry = CustomEncodedValue(
+			function () {
+				if (dmap.save.value == null) return null;
+				let currentRival = dmap.save.value.getUint8(0x4038);
+				let flags = dmap.save.value.getUint16(0x4040, true);
+				if (rival.id === 1) {
+					if ((flags & 0x1000) !== 0) return "DEFEATED";
+					if (currentRival === 1) return "ACTIVE";
+					return "LOCKED";
+				}
+				if (currentRival < rival.id) return "DEFEATED";
+				if (currentRival === rival.id) return "ACTIVE";
+				return "LOCKED";
+			},
+			function (val) {
+				if (dmap.save.value == null) return;
+				let v = (typeof val === "string") ? val.trim().toUpperCase() : "";
+				let currentRival = dmap.save.value.getUint8(0x4038);
+				let flags = dmap.save.value.getUint16(0x4040, true);
+				if (v === "DEFEATED" || v === "1" || v === "BEATEN") {
+					if (rival.id === 1) {
+						dmap.save.value.setUint16(0x4040, flags | 0x1000, true);
+						dmap.save.value.setUint8(0x4038, 1);
+					} else {
+						if (currentRival >= rival.id) {
+							dmap.save.value.setUint8(0x4038, rival.id - 1);
+						}
+					}
+				} else if (v === "ACTIVE" || v === "2") {
+					dmap.save.value.setUint8(0x4038, rival.id);
+					if (rival.id === 1) {
+						dmap.save.value.setUint16(0x4040, flags & ~0x1000, true);
+					}
+				} else if (v === "LOCKED" || v === "0") {
+					if (rival.id === 1) {
+						dmap.save.value.setUint16(0x4040, flags & ~0x1000, true);
+						if (currentRival <= 1) {
+							dmap.save.value.setUint8(0x4038, 2);
+						}
+					} else {
+						if (currentRival <= rival.id) {
+							dmap.save.value.setUint8(0x4038, Math.min(15, rival.id + 1));
+						}
+					}
+				}
+				updateHash();
+			},
+			String,
+			makePlatformProperty(0x4038),
+			1,
+			true,
+			true,
+			`#${rival.id} ${rival.name} (${rival.car})`,
+			undefined,
+			`DEFEATED / ACTIVE / LOCKED`,
+			["DEFEATED", "ACTIVE", "LOCKED"]
+		);
+
+		blGroup.dataValues.push(entry);
+	}
+
+	dmap.blacklistData.push(blGroup);
+}
+
+function fetchJunkmanData() {
+	if (currentPlatform !== "pc") return;
+
+	let junkmanGroup = StructuredData("JUNKMAN & REWARD TOKENS");
+
+	for (let t = 0; t < JUNKMAN_TOKENS.length; t++) {
+		let token = JUNKMAN_TOKENS[t];
+
+		let entry = CustomEncodedValue(
+			function () {
+				if (dmap.save.value == null) return null;
+				let count = 0;
+				for (let i = 0; i < JUNKMAN_SLOT_COUNT; i++) {
+					let off = JUNKMAN_BASE_PC + i * JUNKMAN_SLOT_SIZE;
+					let marker = dmap.save.value.getInt32(off, true);
+					let state = dmap.save.value.getInt32(off + 8, true);
+					if (marker === token.id && state === 1) {
+						count++;
+					}
+				}
+				return count;
+			},
+			function (val) {
+				if (dmap.save.value == null) return;
+				let newCount = parseInt(val);
+				if (isNaN(newCount) || newCount < 0) return;
+
+				let counts = {};
+				for (let i = 0; i < JUNKMAN_SLOT_COUNT; i++) {
+					let off = JUNKMAN_BASE_PC + i * JUNKMAN_SLOT_SIZE;
+					let marker = dmap.save.value.getInt32(off, true);
+					let state = dmap.save.value.getInt32(off + 8, true);
+					if (marker !== 0 && state === 1) {
+						counts[marker] = (counts[marker] || 0) + 1;
+					}
+				}
+
+				counts[token.id] = newCount;
+
+				let slotIdx = 0;
+				for (let j = 0; j < JUNKMAN_TOKENS.length; j++) {
+					let tid = JUNKMAN_TOKENS[j].id;
+					let c = counts[tid] || 0;
+					for (let k = 0; k < c; k++) {
+						if (slotIdx < JUNKMAN_SLOT_COUNT) {
+							let off = JUNKMAN_BASE_PC + slotIdx * JUNKMAN_SLOT_SIZE;
+							dmap.save.value.setInt32(off, tid, true);
+							dmap.save.value.setInt32(off + 4, 0, true);
+							dmap.save.value.setInt32(off + 8, 1, true);
+							slotIdx++;
+						}
+					}
+				}
+
+				while (slotIdx < JUNKMAN_SLOT_COUNT) {
+					let off = JUNKMAN_BASE_PC + slotIdx * JUNKMAN_SLOT_SIZE;
+					dmap.save.value.setInt32(off, 0, true);
+					dmap.save.value.setInt32(off + 4, 0, true);
+					dmap.save.value.setInt32(off + 8, 0, true);
+					slotIdx++;
+				}
+
+				updateHash();
+			},
+			Uint8Array,
+			makePlatformProperty(JUNKMAN_BASE_PC),
+			1,
+			true,
+			true,
+			token.name,
+			undefined,
+			`MAX 63 TOTAL TOKENS`
+		);
+
+		junkmanGroup.dataValues.push(entry);
+	}
+
+	dmap.junkmanData.push(junkmanGroup);
+}
+
+function fetchSpeedListData() {
+	if (currentPlatform !== "pc") return;
+
+	let speedListGroup = StructuredData("SPEED LIST EVENTS");
+
+	for (let i = 0; i < MAX_SPEEDLIST_EVENTS; i++) {
+		let statusOffset = SPEEDLIST_BASE_PC + (i * SPEEDLIST_ENTRY_SIZE);
+
+		let entry = CustomEncodedValue(
+			function () {
+				if (dmap.save.value == null) return null;
+				return dmap.save.value.getUint8(statusOffset);
+			},
+			function (val) {
+				if (dmap.save.value == null) return;
+				let n = parseInt(val);
+				if (isNaN(n) || n < 1 || n > 3) return;
+				dmap.save.value.setUint8(statusOffset, n);
+				updateHash();
+			},
+			Uint8Array,
+			makePlatformProperty(statusOffset),
+			1,
+			true,
+			true,
+			`EVENT ${i + 1} STATUS`,
+			undefined,
+			`1=LOCKED  2=AVAILABLE  3=COMPLETED`,
+			[
+				{ value: 1, text: "LOCKED" },
+				{ value: 2, text: "AVAILABLE" },
+				{ value: 3, text: "COMPLETED" },
+			]
+		);
+
+		speedListGroup.dataValues.push(entry);
+	}
+
+	dmap.speedListData.push(speedListGroup);
+}
+
+function fetchRaceTimesData() {
+	if (currentPlatform !== "pc") return;
+
+	let raceGroup = StructuredData("RACE BEST TIMES");
+
+	for (let i = 0; i < MAX_RACE_ENTRIES; i++) {
+		let entryBase = RACE_BASE_PC + (i * RACE_ENTRY_TOTAL_SIZE);
+		let timeOffset = entryBase + RACE_ENTRY_HEADER_SIZE + 4;
+
+		let entry = CustomEncodedValue(
+			function () {
+				if (dmap.save.value == null) return null;
+				return dmap.save.value.getFloat32(timeOffset, true).toFixed(3);
+			},
+			function (val) {
+				if (dmap.save.value == null) return;
+				let n = parseFloat(val);
+				if (isNaN(n)) return;
+				dmap.save.value.setFloat32(timeOffset, n, true);
+				dmap.save.value.setFloat32(timeOffset + 4, n, true);
+				updateHash();
+			},
+			Float32Array,
+			makePlatformProperty(timeOffset),
+			1,
+			true,
+			true,
+			`RACE ${i + 1} BEST TIME (S)`,
+			undefined,
+			undefined
+		);
+
+		raceGroup.dataValues.push(entry);
+	}
+
+	dmap.raceTimesData.push(raceGroup);
+}
+
 function readSaveFile(event) {
 	dmap.save.value = new DataView(event.target.result, dmap.save.pos, dmap.save.size[currentPlatform]);
-
-	dmap.name.value = dmap.save.value.buffer.slice(
-		dmap.name.pos[currentPlatform],
-		dmap.name.pos[currentPlatform] + dmap.name.length,
-	);
 
 	updateHash();
 
@@ -845,6 +1379,11 @@ function readSaveFile(event) {
 	for (let index = 0; index < MAX_PURSUITS; index++) {
 		fetchSinglePursuitData(index);
 	}
+
+	fetchBlacklistData();
+	fetchJunkmanData();
+	fetchSpeedListData();
+	fetchRaceTimesData();
 
 	showData();
 
@@ -879,6 +1418,10 @@ fileInput.addEventListener("change", function (event) {
 	dmap.save.value = null;
 	dmap.carsData = [];
 	dmap.pursuitsData = [];
+	dmap.blacklistData = [];
+	dmap.junkmanData = [];
+	dmap.speedListData = [];
+	dmap.raceTimesData = [];
 
 	if (playSound) new Audio(OPEN_SOUND).play();
 
