@@ -94,17 +94,30 @@ function makePlatform(name, id) {
 let plaforms = [
 	makePlatform("Desktop", "pc"),
 	makePlatform("Playstation 2", "ps2"),
+	makePlatform("Xbox 360", "x360"),
 ];
 
-function makePlatformProperty(pcVal, ps2Val = null) {
+// The Xbox 360 save has the PC layout, but its values are big-endian
+const BIG_ENDIAN_PLATFORMS = ["x360"];
+
+function platformLittleEndian(littleEndian) {
+	return littleEndian && !BIG_ENDIAN_PLATFORMS.includes(currentPlatform);
+}
+
+function makePlatformProperty(pcVal, ps2Val = null, x360Val = null) {
 	return {
 		pc: pcVal,
 		ps2: (ps2Val == null) ? pcVal : ps2Val,
+		x360: (x360Val == null) ? pcVal : x360Val,
 	};
 }
 
+function shiftPlatformProperty(prop, delta) {
+	return makePlatformProperty(prop.pc + delta, prop.ps2 + delta, prop.x360 + delta);
+}
+
 dmap.save = {
-	size: makePlatformProperty(63596, 62689),
+	size: makePlatformProperty(63596, 62689, 62688),
 	pos: 0,
 
 	/** @type DataView */
@@ -230,6 +243,7 @@ function EncodedValue(
 		pos: makePlatformProperty(
 			prev == undefined ? pos.pc : prev.pos.pc + prev.type.BYTES_PER_ELEMENT * prev.length,
 			prev == undefined ? pos.ps2 : prev.pos.ps2 + prev.type.BYTES_PER_ELEMENT * prev.length,
+			prev == undefined ? pos.x360 : prev.pos.x360 + prev.type.BYTES_PER_ELEMENT * prev.length,
 		),
 		configurable: configurable,
 		description: description,
@@ -244,7 +258,7 @@ function EncodedValue(
 			}
 
 			if (this.type.prototype instanceof TypedArray) {
-				return GetTypedValue(this, this.littleEndian);
+				return GetTypedValue(this, platformLittleEndian(this.littleEndian));
 			} else {
 				switch (this.type) {
 					case String:
@@ -261,7 +275,7 @@ function EncodedValue(
 				const lowest = Math.min(this.length, val.length);
 
 				for (let index = 0; index < lowest; index++) {
-					SetTypedValue(this.type, this.pos[currentPlatform] + index, val[index], this.littleEndian);
+					SetTypedValue(this.type, this.pos[currentPlatform] + index, val[index], platformLittleEndian(this.littleEndian));
 				}
 
 				if (this != dmap.md5) {
@@ -272,7 +286,7 @@ function EncodedValue(
 			}
 
 			if (this.type.prototype instanceof TypedArray) {
-				SetTypedValue(this.type, this.pos[currentPlatform], val, this.littleEndian);
+				SetTypedValue(this.type, this.pos[currentPlatform], val, platformLittleEndian(this.littleEndian));
 			} else {
 				switch (this.type) {
 					case String:
@@ -309,6 +323,7 @@ function CustomEncodedValue(
 		pos: makePlatformProperty(
 			prev == undefined ? pos.pc : prev.pos.pc + prev.type.BYTES_PER_ELEMENT * prev.length,
 			prev == undefined ? pos.ps2 : prev.pos.ps2 + prev.type.BYTES_PER_ELEMENT * prev.length,
+			prev == undefined ? pos.x360 : prev.pos.x360 + prev.type.BYTES_PER_ELEMENT * prev.length,
 		),
 		configurable: configurable,
 		description: description,
@@ -333,11 +348,12 @@ function StructuredData(header) {
 	};
 }
 
-dmap.md5 = EncodedValue(Uint8Array, makePlatformProperty(dmap.save.size.pc - 16, dmap.save.size.ps2 - 16), 16, false);
+dmap.md5 = EncodedValue(Uint8Array, makePlatformProperty(dmap.save.size.pc - 16, dmap.save.size.ps2 - 16, dmap.save.size.x360 - 16), 16, false);
 // Read-only; the size can vary because of Extra Options
 dmap.name = EncodedValue(String, makePlatformProperty(0x5A31), 8, false);
 dmap.money = EncodedValue(Uint32Array, makePlatformProperty(0x4039), undefined, undefined, "MONEY");
-dmap.pursuitBounty = EncodedValue(Uint32Array, makePlatformProperty(0xE865, 0xE8A1), undefined, undefined, "PURSUIT BOUNTY");
+// Xbox 360: same as the PC up to the case name, then 8 bytes further from the car stable on
+dmap.pursuitBounty = EncodedValue(Uint32Array, makePlatformProperty(0xE865, 0xE8A1, 0xE86D), undefined, undefined, "PURSUIT BOUNTY");
 dmap.caseName = CustomEncodedValue(
 	function () {
 		return new TextDecoder().decode(dmap.save.value.buffer.slice(this.pos[currentPlatform], this.pos[currentPlatform] + this.length));
@@ -368,8 +384,8 @@ dmap.caseName = CustomEncodedValue(
 	"ONLY 12 CHARACTERS. CAN PERSIST"
 );
 
-dmap.carsContent = EncodedValue(Uint8Array, makePlatformProperty(0xE2ED, 0xE329), CAR_STRUCT_SIZE * MAX_CARS, false, undefined);
-dmap.pursuitContent = EncodedValue(Uint8Array, makePlatformProperty(0xF2BA, 0xF2F9), PURSUIT_STRUCT_SIZE * MAX_PURSUITS, false, undefined);
+dmap.carsContent = EncodedValue(Uint8Array, makePlatformProperty(0xE2ED, 0xE329, 0xE2F5), CAR_STRUCT_SIZE * MAX_CARS, false, undefined);
+dmap.pursuitContent = EncodedValue(Uint8Array, makePlatformProperty(0xF2BA, 0xF2F9, 0xF2C2), PURSUIT_STRUCT_SIZE * MAX_PURSUITS, false, undefined);
 
 dmap.carsData = [];
 dmap.pursuitsData = [];
@@ -425,87 +441,77 @@ dmap.lifetimePursuit.dataValues.push(EncodedValue(Uint32Array, undefined, undefi
 
 dmap.singlePursuit = StructuredData("SINGLE PURSUIT");
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
-	makePlatformProperty(dmap.lifetimePursuit.dataValues[7].pos.pc + 2 * Uint32Array.BYTES_PER_ELEMENT,
-		dmap.lifetimePursuit.dataValues[7].pos.ps2 + 2 * Uint32Array.BYTES_PER_ELEMENT),
+	shiftPlatformProperty(dmap.lifetimePursuit.dataValues[7].pos, 2 * Uint32Array.BYTES_PER_ELEMENT),
 	undefined,
 	undefined,
 	`PURSUIT LENGTH`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
-	makePlatformProperty(dmap.singlePursuit.dataValues[0].pos.pc + 2 * Uint32Array.BYTES_PER_ELEMENT,
-		dmap.singlePursuit.dataValues[0].pos.ps2 + 2 * Uint32Array.BYTES_PER_ELEMENT),
+	shiftPlatformProperty(dmap.singlePursuit.dataValues[0].pos, 2 * Uint32Array.BYTES_PER_ELEMENT),
 	undefined,
 	undefined,
 	`TOTAL POLICE VEHICLES INVOLVED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
-	makePlatformProperty(dmap.singlePursuit.dataValues[1].pos.pc + 2 * Uint32Array.BYTES_PER_ELEMENT,
-		dmap.singlePursuit.dataValues[1].pos.ps2 + 2 * Uint32Array.BYTES_PER_ELEMENT),
+	shiftPlatformProperty(dmap.singlePursuit.dataValues[1].pos, 2 * Uint32Array.BYTES_PER_ELEMENT),
 	undefined,
 	undefined,
 	`POLICE VEHICLES DAMAGED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
-	makePlatformProperty(dmap.singlePursuit.dataValues[2].pos.pc + 2 * Uint32Array.BYTES_PER_ELEMENT,
-		dmap.singlePursuit.dataValues[2].pos.ps2 + 2 * Uint32Array.BYTES_PER_ELEMENT),
+	shiftPlatformProperty(dmap.singlePursuit.dataValues[2].pos, 2 * Uint32Array.BYTES_PER_ELEMENT),
 	undefined,
 	undefined,
 	`POLICE VEHICLES IMMOBILIZED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
-	makePlatformProperty(dmap.singlePursuit.dataValues[3].pos.pc + 2 * Uint32Array.BYTES_PER_ELEMENT,
-		dmap.singlePursuit.dataValues[3].pos.ps2 + 2 * Uint32Array.BYTES_PER_ELEMENT),
+	shiftPlatformProperty(dmap.singlePursuit.dataValues[3].pos, 2 * Uint32Array.BYTES_PER_ELEMENT),
 	undefined,
 	undefined,
 	`SPIKE STRIPS DODGED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
-	makePlatformProperty(dmap.singlePursuit.dataValues[4].pos.pc + 2 * Uint32Array.BYTES_PER_ELEMENT,
-		dmap.singlePursuit.dataValues[4].pos.ps2 + 2 * Uint32Array.BYTES_PER_ELEMENT),
+	shiftPlatformProperty(dmap.singlePursuit.dataValues[4].pos, 2 * Uint32Array.BYTES_PER_ELEMENT),
 	undefined,
 	undefined,
 	`ROADBLOCKS DODGED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
-	makePlatformProperty(dmap.singlePursuit.dataValues[5].pos.pc + 2 * Uint32Array.BYTES_PER_ELEMENT,
-		dmap.singlePursuit.dataValues[5].pos.ps2 + 2 * Uint32Array.BYTES_PER_ELEMENT),
+	shiftPlatformProperty(dmap.singlePursuit.dataValues[5].pos, 2 * Uint32Array.BYTES_PER_ELEMENT),
 	undefined,
 	undefined,
 	`HELICOPTERS DEPLOYED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
-	makePlatformProperty(dmap.singlePursuit.dataValues[6].pos.pc + 2 * Uint32Array.BYTES_PER_ELEMENT,
-		dmap.singlePursuit.dataValues[6].pos.ps2 + 2 * Uint32Array.BYTES_PER_ELEMENT),
+	shiftPlatformProperty(dmap.singlePursuit.dataValues[6].pos, 2 * Uint32Array.BYTES_PER_ELEMENT),
 	undefined,
 	undefined,
 	`COST TO STATE ACHIEVED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
-	makePlatformProperty(dmap.singlePursuit.dataValues[7].pos.pc + 2 * Uint32Array.BYTES_PER_ELEMENT,
-		dmap.singlePursuit.dataValues[7].pos.ps2 + 2 * Uint32Array.BYTES_PER_ELEMENT),
+	shiftPlatformProperty(dmap.singlePursuit.dataValues[7].pos, 2 * Uint32Array.BYTES_PER_ELEMENT),
 	undefined,
 	undefined,
 	`INFRACTIONS RECORDED`
 ));
 
 dmap.singlePursuit.dataValues.push(EncodedValue(Uint32Array,
-	makePlatformProperty(dmap.singlePursuit.dataValues[8].pos.pc + 2 * Uint32Array.BYTES_PER_ELEMENT,
-		dmap.singlePursuit.dataValues[8].pos.ps2 + 2 * Uint32Array.BYTES_PER_ELEMENT),
+	shiftPlatformProperty(dmap.singlePursuit.dataValues[8].pos, 2 * Uint32Array.BYTES_PER_ELEMENT),
 	undefined,
 	undefined,
 	`PURSUIT BOUNTY ACHIEVED`
 ));
 
 dmap.infractions = StructuredData("INFRACTIONS");
-dmap.infractions.dataValues.push(EncodedValue(Uint16Array, makePlatformProperty(0xE86D, 0xE8A9), undefined, undefined, `SPEEDING`));
+dmap.infractions.dataValues.push(EncodedValue(Uint16Array, makePlatformProperty(0xE86D, 0xE8A9, 0xE875), undefined, undefined, `SPEEDING`));
 
 dmap.infractions.dataValues.push(EncodedValue(Uint16Array, undefined, undefined, undefined,
 	`EXCESSIVE SPEEDING`,
@@ -553,6 +559,7 @@ dmap.content = {
 	size: makePlatformProperty(
 		dmap.save.size.pc - 0x34 - dmap.md5.length,
 		dmap.save.size.ps2 - 0x34 - dmap.md5.length,
+		dmap.save.size.x360 - 0x34 - dmap.md5.length,
 	),
 	pos: 0x34,
 };
@@ -761,19 +768,38 @@ function fetchSinglePursuitData(index) {
 	let pursuitData = StructuredData(`PURSUIT #${index + 1}`);
 
 	let timePos = dmap.pursuitContent.pos[currentPlatform] + (index * PURSUIT_STRUCT_SIZE) + PURSUIT_ID_SIZE;
-	pursuitData.dataValues.push(EncodedValue(Uint32Array, makePlatformProperty(timePos), undefined, undefined, `PURSUIT LENGTH`));
 
-	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
-		`PURSUIT BOUNTY ACHIEVED`,
-		undefined,
-		pursuitData.dataValues[0]
-	));
+	if (currentPlatform == "x360") {
+		// Xbox 360 record after the ID: a 32-bit value (not editable), the bounty, then the length
+		// (checked against the lifetime and last pursuit stats of a real save)
+		pursuitData.dataValues.push(EncodedValue(Uint32Array, makePlatformProperty(timePos), undefined, false, `UNKNOWN`));
 
-	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, false,
-		`UNKNOWN`,
-		undefined,
-		pursuitData.dataValues[1]
-	));
+		pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
+			`PURSUIT BOUNTY ACHIEVED`,
+			undefined,
+			pursuitData.dataValues[0]
+		));
+
+		pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
+			`PURSUIT LENGTH`,
+			undefined,
+			pursuitData.dataValues[1]
+		));
+	} else {
+		pursuitData.dataValues.push(EncodedValue(Uint32Array, makePlatformProperty(timePos), undefined, undefined, `PURSUIT LENGTH`));
+
+		pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
+			`PURSUIT BOUNTY ACHIEVED`,
+			undefined,
+			pursuitData.dataValues[0]
+		));
+
+		pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, false,
+			`UNKNOWN`,
+			undefined,
+			pursuitData.dataValues[1]
+		));
+	}
 
 	pursuitData.dataValues.push(EncodedValue(Uint32Array, undefined, undefined, undefined,
 		`TOTAL POLICE VEHICLES INVOLVED`,
@@ -826,7 +852,22 @@ function fetchSinglePursuitData(index) {
 	dmap.pursuitsData.push(pursuitData);
 }
 
+function detectPlatform(buffer) {
+	// "20CM" on PC (little-endian "MC02"), "MC02" on the Xbox 360 (big-endian)
+	const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, 4));
+
+	if (magic == "MC02") {
+		currentPlatform = "x360";
+	} else if (magic == "20CM" && currentPlatform == "x360") {
+		currentPlatform = "pc";
+	}
+
+	platformsList.value = currentPlatform;
+}
+
 function readSaveFile(event) {
+	detectPlatform(event.target.result);
+
 	dmap.save.value = new DataView(event.target.result, dmap.save.pos, dmap.save.size[currentPlatform]);
 
 	dmap.name.value = dmap.save.value.buffer.slice(
@@ -866,6 +907,49 @@ function updateHash() {
 	dmap.md5.value = tempHash;
 
 	fileHash.innerText = `HASH : ` + toHex(tempHash);
+
+	updateHeaderCrcs();
+}
+
+// Xbox 360 saves also carry three EA CRC32s in their header (big-endian), which the game checks.
+// They are written in this order, after the MD5: 0x10 = CRC of [0x1C, 0x24), 0x14 = CRC of
+// [0x24, end), 0x18 = CRC of [0x00, 0x18) (layout from sprintstate/nfs-mw-save-editor).
+const EA_CRC_TABLE = (function () {
+	let table = new Uint32Array(256);
+
+	for (let i = 0; i < 256; i++) {
+		let c = i << 24;
+
+		for (let k = 0; k < 8; k++) {
+			c = (c & 0x80000000) ? ((c << 1) ^ 0x04C11DB7) : (c << 1);
+		}
+
+		table[i] = c >>> 0;
+	}
+
+	return table;
+})();
+
+function eaCrc32(bytes) {
+	// seeded with the first 4 bytes (big-endian), inverted
+	let crc = ~((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+
+	for (let i = 4; i < bytes.length; i++) {
+		crc = (((crc << 8) | bytes[i]) ^ EA_CRC_TABLE[crc >>> 24]) >>> 0;
+	}
+
+	return ~crc >>> 0;
+}
+
+function updateHeaderCrcs() {
+	if (currentPlatform != "x360") return;
+
+	let view = dmap.save.value;
+	let bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+
+	view.setUint32(0x10, eaCrc32(bytes.subarray(0x1C, 0x24)), false);
+	view.setUint32(0x14, eaCrc32(bytes.subarray(0x24)), false);
+	view.setUint32(0x18, eaCrc32(bytes.subarray(0x00, 0x18)), false);
 }
 
 fileInput.addEventListener("click", function (event) {
